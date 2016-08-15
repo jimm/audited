@@ -585,4 +585,68 @@ describe Audited::Auditor do
       }.to_not change( Audited.audit_class, :count )
     end
   end
+
+  describe "asynchronous" do
+    let!(:owner) { Models::ActiveRecord::Owner.create(:name => 'Models::ActiveRecord::Owner') }
+    let!(:owned_company) {
+      Models::ActiveRecord::AsyncOwnedCompanyRequired.new(:name => 'The auditors', :owner => owner)
+    }
+
+    it "should have async enabled" do
+      expect(owned_company.async_enabled).to be_truthy
+    end
+
+    it "should have a class attribute that can store attrs" do
+      expect(owned_company.class.batched_audit_attrs).to eq []
+    end
+
+    it "should be valid (sanity check)" do
+      expect(owned_company).to be_valid
+      expect(owned_company.save).to be_truthy
+    end
+
+    it "should enqueue the job" do
+      expect(Audited::Async::Synchronous).to receive(:enqueue)
+      owned_company.save
+    end
+
+    it "should save audit records to the database" do
+      expect {
+        owned_company.save
+      }.to change( Audited.audit_class, :count )
+    end
+
+    it "should save the owned_company's id and type" do
+      expect {
+        owned_company.save
+      }.to change {
+        Audited.audit_class
+          .where(auditable_id: owned_company.id, auditable_type: owned_company.class.name)
+          .count
+      }.by(1)
+    end
+
+    it "should not save if validation failed" do
+      owned_company.owner = nil
+      expect {
+        expect(owned_company.save).to eq false
+      }.not_to change( Audited.audit_class, :count )
+    end
+
+    it "should empty the class variable after saving" do
+      owned_company.save
+      expect(owned_company.class.batched_audit_attrs).to be_empty
+    end
+
+    it "should write synchronously on async error" do
+      allow(Audited::Async::Synchronous).to receive(:enqueue).and_raise(StandardError)
+      expect {
+        owned_company.save
+      }.to change {
+        Audited.audit_class
+          .where(auditable_id: owned_company.id, auditable_type: owned_company.class.name)
+          .count
+      }.by(1)
+    end
+  end
 end

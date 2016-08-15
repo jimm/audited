@@ -246,6 +246,48 @@ To disable auditing on an entire model:
 User.auditing_enabled = false
 ```
 
+### Asynchronous Auditing
+
+You can create audit records asynchronously by specifying an async adapter:
+
+```ruby
+class User
+  audited async: :resque
+end
+```
+
+The only adapter currently available is `:resque`.
+
+Using this feature will trigger a deprecation warning in some versions of
+Rails related to the use of `after_commit`. The warning includes directions
+on how to opt in to the new behaviour and remove the warning.
+
+### Disabling Asynchronous Auditing
+
+If you want to disable asynchronous auditing, forcing audit records to be
+created synchronously, while temporarily doing certain tasks there are a few
+methods available.
+
+To disable async auditing on a save:
+
+```ruby
+@user.save_without_async
+```
+
+or:
+
+```ruby
+@user.without_async do
+  @user.save
+end
+```
+
+To disable asyncronous auditing on an entire model:
+
+```ruby
+User.async_enabled = false
+```
+
 ## Gotchas
 
 ### Using attr_protected with Rails 4.x
