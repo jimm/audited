@@ -600,11 +600,6 @@ describe Audited::Auditor do
       expect(owned_company.class.batched_audit_attrs).to eq []
     end
 
-    it "should be valid (sanity check)" do
-      expect(owned_company).to be_valid
-      expect(owned_company.save).to be_truthy
-    end
-
     it "should enqueue the job" do
       expect(Audited::Async::Synchronous).to receive(:enqueue)
       owned_company.save
