@@ -146,18 +146,18 @@ module Audited
       end
 
       # Temporarily turns off auditing while saving.
-      def save_without_async
-        without_async { save }
+      def save_without_async_auditing
+        without_async_auditing { save }
       end
 
       # Executes the block with synchronous writing.
       #
-      #   @foo.without_async do
+      #   @foo.without_async_auditing do
       #     @foo.save
       #   end
       #
-      def without_async(&block)
-        self.class.without_async(&block)
+      def without_async_auditing(&block)
+        self.class.without_async_auditing(&block)
       end
 
       # Gets an array of the revisions available
@@ -271,9 +271,10 @@ module Audited
       # batch. Called after commit. If anything goes wrong, the audit
       # records are written synchronously.
       def audit_queue
-        self.class.async_class.enqueue(Audited.audit_class, Thread.current[self.class.batched_audit_attrs_sym])
+        self.class.async_class.enqueue(Audited.audit_class.name,
+                                       Thread.current[self.class.batched_audit_attrs_sym])
       rescue
-        without_async do
+        without_async_auditing do
           Thread.current[self.class.batched_audit_attrs_sym].each do |attrs|
             write_audit(attrs)
           end
@@ -301,10 +302,10 @@ module Audited
         attrs[:auditable_id] = self.id
         attrs[:auditable_type] = self.class.name
         attrs.delete(:auditable) # don't bother sending whole object to queue
-        if audit_associated_with
-          assoc = self.send(audit_associated_with)
-          attrs[:associated_id] = assoc.id
-          attrs[:associated_type] = assoc.class.name
+        if attrs[:associated]
+          attrs[:associated_id] = attrs[:associated].id
+          attrs[:associated_type] = attrs[:associated].class.name
+          attrs.delete(:associated)
         end
         user = Thread.current[:audited_user]
         if user
@@ -381,11 +382,11 @@ module Audited
 
       # Executes the block with async auditing disabled.
       #
-      #   Foo.without_async do
+      #   Foo.without_async_auditing do
       #     @foo.save
       #   end
       #
-      def without_async
+      def without_async_auditing
         auditing_was_async = async_enabled
         disable_async
         yield

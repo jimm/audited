@@ -601,7 +601,16 @@ describe Audited::Auditor do
     end
 
     it "should enqueue the job" do
-      expect(Audited::Async::Synchronous).to receive(:enqueue)
+      expect(Audited::Async::Synchronous)
+        .to receive(:enqueue)
+             .with(Audited.audit_class.name, [
+                     {action: "create",
+                      audited_changes: {"name"=>"The auditors", "owner_id"=>owner.id},
+                      comment: nil,
+                      auditable_type: owned_company.class.name,
+                      auditable_id: anything,
+                      associated_type: owner.class.name,
+                      associated_id: owner.id}])
       owned_company.save
     end
 
@@ -616,7 +625,7 @@ describe Audited::Auditor do
         owned_company.save
       }.to change {
         Audited.audit_class
-          .where(auditable_id: owned_company.id, auditable_type: owned_company.class.name)
+          .where(auditable_type: owned_company.class.name)
           .count
       }.by(1)
     end
@@ -648,9 +657,15 @@ describe Audited::Auditor do
         owned_company.save
       }.to change {
         Audited.audit_class
-          .where(auditable_id: owned_company.id, auditable_type: owned_company.class.name)
+          .where(auditable_type: owned_company.class.name)
           .count
       }.by(1)
+    end
+
+    it "should save the associated audit records" do
+      owned_company.save
+      expect(owner.associated_audits.length).to eq(1)
+      expect(owner.associated_audits.first.auditable).to eq(owned_company)
     end
   end
 end

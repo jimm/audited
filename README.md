@@ -316,13 +316,13 @@ methods available.
 To disable async auditing on a save:
 
 ```ruby
-@user.save_without_async
+@user.save_without_async_auditing
 ```
 
 or:
 
 ```ruby
-@user.without_async do
+@user.without_async_auditing do
   @user.save
 end
 ```
