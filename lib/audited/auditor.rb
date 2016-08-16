@@ -95,9 +95,10 @@ module Audited
         class_attribute :async_enabled, instance_writer: false
         if options[:async]
           class_attribute :async_class, instance_writer: false
-          class_attribute :batched_audit_attrs, instance_writer: false
+          class_attribute :batched_audit_attrs_sym, instance_writer: false
           after_commit :audit_queue
-          self.batched_audit_attrs = []
+          self.batched_audit_attrs_sym = "#{self.name}_batched_audit_attrs".to_sym
+          Thread.current[self.batched_audit_attrs_sym] = []
           self.async_enabled = true
           self.async_class = ASYNC_ADAPTERS[options[:async]]
         else
@@ -270,25 +271,25 @@ module Audited
       # batch. Called after commit. If anything goes wrong, the audit
       # records are written synchronously.
       def audit_queue
-        self.class.async_class.enqueue(self.class.batched_audit_attrs)
+        self.class.async_class.enqueue(Audited.audit_class, Thread.current[self.class.batched_audit_attrs_sym])
       rescue
         without_async do
-          self.class.batched_audit_attrs.each do |attrs|
+          Thread.current[self.class.batched_audit_attrs_sym].each do |attrs|
             write_audit(attrs)
           end
         end
       ensure
-        self.class.batched_audit_attrs = []
+        Thread.current[self.class.batched_audit_attrs_sym] = []
       end
 
       def write_audit(attrs)
         return unless auditing_enabled
 
+        attrs[:associated] = self.send(audit_associated_with) unless audit_associated_with.nil?
+        self.audit_comment = nil
         if self.async_enabled
           async_write_audit(attrs)
         else
-          attrs[:associated] = self.send(audit_associated_with) unless audit_associated_with.nil?
-          self.audit_comment = nil
           run_callbacks(:audit)  { self.audits.create!(attrs) }
         end
       end
@@ -310,7 +311,7 @@ module Audited
           attrs[:user_id] = user.id
           attrs[:user_type] = user.class.name
         end
-        self.class.batched_audit_attrs << attrs
+        Thread.current[self.class.batched_audit_attrs_sym] << attrs
       end
 
       def require_comment

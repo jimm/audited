@@ -256,12 +256,56 @@ class User
 end
 ```
 
-The only adapter currently available is `:resque`. It uses a queue named
-`:audit`.
+There are two adapter currently available: `:resque` and `:sync`. The former
+uses a queue named `:audit`. The latter is mostly used for testing, since it
+synchronously creates all audits passed to it.
 
 Using this feature will trigger a deprecation warning in some versions of
 Rails related to the use of `after_commit`. The warning includes directions
 on how to opt in to the new behaviour and remove the warning.
+
+#### Behind the Scenes
+
+When an audit records should be created, its attributes are put into a
+class-level array. On commit, that array is sent to the async adapter for
+processing.
+
+If the adapter raises an error when trying to enqueue audits, the audits are
+written synchronously instead.
+
+#### Creating an Async Adapter
+
+Each Audited::Async adapter must implemented an `enqueue` class method that
+takes two arguments: the name of the audit class to instantiate and an array
+of audit creation attribute hashes. For each attribute hash, it should
+asynchronously create the audit record from the class and attributes. Here's
+an example:
+
+```ruby
+module Audited
+  module Async
+    class Resque
+      @queue = :audit
+
+      def self.enqueue(klass_name, audits_attrs)
+        Resque.enqueue(self, klass_name, audits_attrs)
+      end
+
+      # Takes a model `klass` and an array of hashes of audit `attrs` and
+      # creates audit records from them.
+      def self.perform(klass_name, audits_attrs)
+        klass = Module.const_get(klass_name)
+        audits_attrs.each do |attrs|
+          klass.create(attrs)
+        end
+      end
+    end
+  end
+end
+```
+
+When adding an adapter, make sure to add it to `ASYNC_ADAPTERS` in
+`../auditor.rb`.
 
 ### Disabling Asynchronous Auditing
 
