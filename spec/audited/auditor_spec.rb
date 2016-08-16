@@ -628,6 +628,15 @@ describe Audited::Auditor do
       }.not_to change( Audited.audit_class, :count )
     end
 
+    it "should not save if transaction is rolled back" do
+      expect {
+        owned_company.class.transaction do
+          expect(owned_company.save).to eq true
+          raise ActiveRecord::Rollback
+        end
+      }.not_to change( Audited.audit_class, :count )
+    end
+
     it "should empty the class variable after saving" do
       owned_company.save
       expect(owned_company.class.batched_audit_attrs).to be_empty
