@@ -256,7 +256,8 @@ class User
 end
 ```
 
-The only adapter currently available is `:resque`.
+The only adapter currently available is `:resque`. It uses a queue named
+`:audit`.
 
 Using this feature will trigger a deprecation warning in some versions of
 Rails related to the use of `after_commit`. The warning includes directions
