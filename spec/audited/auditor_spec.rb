@@ -1,4 +1,5 @@
 require "spec_helper"
+require "audited/async/synchronous"
 
 describe Audited::Auditor do
 
@@ -592,6 +593,15 @@ describe Audited::Auditor do
       Models::ActiveRecord::AsyncOwnedCompanyRequired.new(:name => 'The auditors', :owner => owner)
     }
 
+    before do
+      @old_async_class = Audited.async_class
+      Audited.async_class = Audited::Async::Synchronous
+    end
+
+    after do
+      Audited.async_class = @old_async_class
+    end
+
     it "should have async enabled" do
       expect(owned_company.async_enabled).to be_truthy
     end
@@ -653,6 +663,17 @@ describe Audited::Auditor do
 
     it "should write synchronously on async error" do
       allow(Audited::Async::Synchronous).to receive(:enqueue).and_raise(StandardError)
+      expect {
+        owned_company.save
+      }.to change {
+        Audited.audit_class
+          .where(auditable_type: owned_company.class.name)
+          .count
+      }.by(1)
+    end
+
+    it "should write synchronously if no audit class defined" do
+      Audited.async_class = nil
       expect {
         owned_company.save
       }.to change {

@@ -3,6 +3,11 @@ module Audited
     class Resque
       @queue = :audit
 
+      # Allow override in initializer
+      def self.queue=(queue)
+        @queue = queue.to_sym
+      end
+
       def self.enqueue(klass_name, audits_attrs)
         Resque.enqueue(self, klass_name, audits_attrs)
       end

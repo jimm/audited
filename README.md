@@ -248,21 +248,41 @@ User.auditing_enabled = false
 
 ### Asynchronous Auditing
 
-You can create audit records asynchronously by specifying an async adapter:
+To create audit records asynchronously, you need to tell Audited which
+adapter to use by setting `Audited.async_class`. Here is an example
+`config/initializers/audited.rb`:
 
 ```ruby
-class User
-  audited async: :resque
+if Rails.env.test?
+  Audited.async_class = Audited::Async::Synchronous
+else
+  Audited.async_class = Audited::Async::Resque
+  # The default queue name is :audit. To specify your own, do this:
+  Audited::Async::Resque.queue = :my_queue
 end
 ```
 
-There are two adapter currently available: `:resque` and `:sync`. The former
-uses a queue named `:audit`. The latter is mostly used for testing, since it
-synchronously creates all audits passed to it.
+In your model, set `async` to true:
 
-Using this feature will trigger a deprecation warning in some versions of
-Rails related to the use of `after_commit`. The warning includes directions
-on how to opt in to the new behaviour and remove the warning.
+```ruby
+class User < ActiveRecord::Base
+  audited async: true
+end
+```
+
+There are two adapter currently available: `Audited::Async::Resque` and
+`Audited::Async::Synchronous`. The Resque adapter's default queue name is
+`:audit`. The latter is mostly used for testing, since it synchronously
+creates all audits passed to it.
+
+Using asynchronous auditing will trigger a deprecation warning in some
+versions of Rails related to the use of `after_commit`. The warning
+describes the issue and includes directions on how to opt in to the new
+behaviour and remove the warning:
+
+```ruby
+config.active_record.raise_in_transactional_callbacks = true
+```
 
 #### Behind the Scenes
 
@@ -304,8 +324,8 @@ module Audited
 end
 ```
 
-When adding an adapter, make sure to add it to `ASYNC_ADAPTERS` in
-`../auditor.rb`.
+When adding an adapter, make sure to add it to the list of autoloads in
+`lib/audited/audit.rb`.
 
 ### Disabling Asynchronous Auditing
 

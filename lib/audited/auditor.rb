@@ -1,6 +1,3 @@
-require 'audited/async/resque'
-require 'audited/async/synchronous'
-
 module Audited
   # Specify this act if you want changes to your model to be saved in an
   # audit table.  This assumes there is an audits table ready.
@@ -18,10 +15,6 @@ module Audited
     extend ActiveSupport::Concern
 
     CALLBACKS = [:audit_create, :audit_update, :audit_destroy, :audit_queue]
-    ASYNC_ADAPTERS = {
-      resque: Audited::Async::Resque,
-      sync: Audited::Async::Synchronous
-    }
 
     module ClassMethods
       # == Configuration options
@@ -100,7 +93,6 @@ module Audited
           self.batched_audit_attrs_sym = "#{self.name}_batched_audit_attrs".to_sym
           Thread.current[self.batched_audit_attrs_sym] = []
           self.async_enabled = true
-          self.async_class = ASYNC_ADAPTERS[options[:async]]
         else
           self.async_enabled = false
         end
@@ -271,8 +263,9 @@ module Audited
       # batch. Called after commit. If anything goes wrong, the audit
       # records are written synchronously.
       def audit_queue
-        self.class.async_class.enqueue(Audited.audit_class.name,
-                                       Thread.current[self.class.batched_audit_attrs_sym])
+        raise "nil Audited.async_class" unless Audited.async_class # rescue below
+        Audited.async_class.enqueue(Audited.audit_class.name,
+                                    Thread.current[self.class.batched_audit_attrs_sym])
       rescue
         without_async_auditing do
           Thread.current[self.class.batched_audit_attrs_sym].each do |attrs|

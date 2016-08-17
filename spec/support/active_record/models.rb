@@ -94,7 +94,7 @@ module Models
       belongs_to :owner, class_name: "Owner"
       validates_presence_of :owner
       attr_accessible :name, :owner if respond_to?(:attr_accessible) # declare attr_accessible before calling aaa
-      audited associated_with: :owner, async: :sync                  # for testing only: synchronous writes
+      audited associated_with: :owner, async: true
     end
   end
 end
